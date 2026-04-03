@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adidas Vibes — Activation Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0a; color: #fff; font-family: Arial, sans-serif; min-height: 100vh; }
+  .login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-box { background: #141414; border: 1px solid #2a2a2a; border-radius: 12px; padding: 40px; width: 360px; }
+  .login-box h1 { font-size: 20px; margin-bottom: 8px; letter-spacing: 2px; text-transform: uppercase; }
+  .login-box p { font-size: 13px; color: #666; margin-bottom: 24px; }
+  input { width: 100%; padding: 12px 16px; background: #1e1e1e; border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 12px; }
+  button { width: 100%; padding: 12px; background: #fff; color: #000; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
+  button:hover { background: #ddd; }
+  .error { color: #cc3333; font-size: 12px; margin-top: 8px; }
+  .dashboard { display: none; padding: 32px; }
+  .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 1px solid #2a2a2a; }
+  .dash-header h1 { font-size: 14px; letter-spacing: 3px; text-transform: uppercase; color: #888; }
+  .dash-header h1 span { color: #fff; }
+  .stats { display: flex; gap: 16px; margin-bottom: 32px; }
+  .stat { background: #141414; border: 1px solid #2a2a2a; border-radius: 8px; padding: 20px 24px; flex: 1; }
+  .stat-label { font-size: 11px; color: #555; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+  .stat-value { font-size: 32px; font-weight: bold; }
+  .export-btn { padding: 10px 20px; background: transparent; border: 1px solid #444; color: #ccc; border-radius: 8px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
+  .export-btn:hover { background: #1e1e1e; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { border-bottom: 1px solid #2a2a2a; }
+  th { text-align: left; padding: 12px 16px; font-size: 11px; color: #555; letter-spacing: 1px; text-transform: uppercase; font-weight: normal; }
+  tbody tr { border-bottom: 1px solid #1a1a1a; transition: background 0.1s; }
+  tbody tr:hover { background: #141414; }
+  td { padding: 14px 16px; font-size: 13px; color: #ccc; }
+  .vibe-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
+  .video-link { color: #fff; text-decoration: none; font-size: 12px; padding: 6px 12px; border: 1px solid #333; border-radius: 6px; }
+  .video-link:hover { background: #1e1e1e; }
+  .empty { text-align: center; padding: 80px; color: #444; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="login" id="loginView">
+  <div class="login-box">
+    <h1>Adidas Vibes</h1>
+    <p>Activation Dashboard — Authorised Access Only</p>
+    <input type="password" id="passwordInput" placeholder="Enter password" />
+    <button onclick="login()">Access Dashboard</button>
+    <div class="error" id="loginError"></div>
+  </div>
+</div>
+
+<div class="dashboard" id="dashboardView">
+  <div class="dash-header">
+    <h1>Adidas Vibes / <span>Participant Dashboard</span></h1>
+    <button class="export-btn" onclick="exportCSV()">Export CSV</button>
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Total Opted In</div>
+      <div class="stat-value" id="statTotal">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Most Popular Vibe</div>
+      <div class="stat-value" id="statVibe" style="font-size:18px;padding-top:8px;">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Latest Submission</div>
+      <div class="stat-value" id="statLatest" style="font-size:16px;padding-top:8px;">—</div>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Vibe</th>
+        <th>Date & Time</th>
+        <th>Video</th>
+      </tr>
+    </thead>
+    <tbody id="participantTable"></tbody>
+  </table>
+  <div class="empty" id="emptyState" style="display:none;">
+    No opted-in participants yet.
+  </div>
+</div>
+
+<script>
+const API_URL = 'https://adidas-vibes-api.zahur.workers.dev';
+const VIBE_COLOURS = {
+  'DREAM GLAZE': '#8B5E3C',
+  'CHILL ZONE': '#9B8FD4',
+  'HAPPY FEELS': '#FF6B9D',
+  'GET COMFY': '#FF8C42',
+  'SPARK UP': '#39FF14',
+};
+
+let password = '';
+let participants = [];
+
+async function login() {
+  password = document.getElementById('passwordInput').value;
+  if (!password) return;
+  try {
+    const res = await fetch(API_URL + '/data', {
+      headers: { 'Authorization': `Bearer ${password}` }
+    });
+    if (res.status === 401) {
+      document.getElementById('loginError').textContent = 'Incorrect password.';
+      return;
+    }
+    participants = await res.json();
+    document.getElementById('loginView').style.display = 'none';
+    document.getElementById('dashboardView').style.display = 'block';
+    renderDashboard();
+  } catch (e) {
+    document.getElementById('loginError').textContent = 'Connection error. Try again.';
+  }
+}
+
+function renderDashboard() {
+  document.getElementById('statTotal').textContent = participants.length;
+
+  if (participants.length === 0) {
+    document.getElementById('emptyState').style.display = 'block';
+    return;
+  }
+
+  const vibeCounts = {};
+  participants.forEach(p => {
+    vibeCounts[p.vibe] = (vibeCounts[p.vibe] || 0) + 1;
+  });
+  const topVibe = Object.entries(vibeCounts).sort((a, b) => b[1] - a[1])[0];
+  document.getElementById('statVibe').textContent = topVibe ? topVibe[0] : '—';
+
+  const latest = new Date(participants[0].created_at);
+  document.getElementById('statLatest').textContent =
+    latest.toLocaleDateString('en-ZA') + ' ' +
+    latest.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+
+  const tbody = document.getElementById('participantTable');
+  tbody.innerHTML = participants.map((p, i) => {
+    const colour = VIBE_COLOURS[p.vibe] || '#fff';
+    const date = new Date(p.created_at);
+    return `
+      <tr>
+        <td style="color:#555;">${i + 1}</td>
+        <td>${p.full_name}</td>
+        <td>${p.email}</td>
+        <td><span class="vibe-badge" style="background:${colour}22;color:${colour};">${p.vibe}</span></td>
+        <td style="color:#666;">${date.toLocaleDateString('en-ZA')} ${date.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}</td>
+        <td><a href="${p.microsite_url}" target="_blank" class="video-link">Watch →</a></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function exportCSV() {
+  const headers = ['#', 'Name', 'Email', 'Vibe', 'Date', 'Video URL'];
+  const rows = participants.map((p, i) => [
+    i + 1,
+    `"${p.full_name}"`,
+    p.email,
+    p.vibe,
+    new Date(p.created_at).toLocaleString('en-ZA'),
+    p.microsite_url
+  ]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `adidas-vibes-participants-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+}
+
+document.getElementById('passwordInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') login();
+});
+</script>
+</body>
+</html>
